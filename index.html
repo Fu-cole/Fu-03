@@ -738,5 +738,117 @@
             });
         });
     </script>
+        // Supabase 配置 - 替换为你的项目信息
+        const SUPABASE_CONFIG = {
+            url: 'https://hrrzmkebkouxmonpefyh.supabase.co',  // 替换为你的 Supabase URL
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhycnpta2Via291eG1vbnBlZnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4MjU2ODAsImV4cCI6MjA3NjQwMTY4MH0.qPsagPVEEeTe9ia39wcByn1ahXJx3Zb5vLGMQRmUS2o'  // 替换为你的 anon public 密钥
+        };
+
+        // 初始化 Supabase
+        const supabase = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
+
+        class SupabaseLikeSystem {
+            constructor() {
+                this.likeButton = document.getElementById('likeButton');
+                this.likeCount = document.getElementById('likeCount');
+                this.likeIcon = this.likeButton.querySelector('i');
+                this.isLoading = false;
+                
+                this.init();
+            }
+            
+            async init() {
+                // 检查用户是否已经点赞
+                this.hasVoted = localStorage.getItem('hasVoted') === 'true';
+                
+                if (this.hasVoted) {
+                    this.disableLikeButton();
+                }
+                
+                // 获取当前点赞数
+                await this.updateLikeCount();
+                
+                // 绑定点击事件
+                this.likeButton.addEventListener('click', () => this.handleLike());
+            }
+            
+            async updateLikeCount() {
+                try {
+                    const { data, error } = await supabase
+                        .from('likes')
+                        .select('count')
+                        .eq('id', 1)
+                        .single();
+                    
+                    if (error) throw error;
+                    
+                    this.likeCount.textContent = data.count;
+                } catch (error) {
+                    console.error('获取点赞数失败:', error);
+                    this.likeCount.textContent = '?';
+                }
+            }
+            
+            async handleLike() {
+                if (this.hasVoted || this.isLoading) return;
+                
+                this.isLoading = true;
+                this.likeButton.classList.add('loading');
+                
+                try {
+                    // 调用 Supabase 函数增加点赞数
+                    const { data, error } = await supabase
+                        .rpc('increment_likes');
+                    
+                    if (error) throw error;
+                    
+                    // 更新UI
+                    this.hasVoted = true;
+                    localStorage.setItem('hasVoted', 'true');
+                    this.disableLikeButton();
+                    this.showMessage('感谢你的点赞！❤️');
+                    
+                    // 更新计数
+                    await this.updateLikeCount();
+                    
+                } catch (error) {
+                    console.error('点赞失败:', error);
+                    this.showMessage('点赞失败，请重试', true);
+                } finally {
+                    this.isLoading = false;
+                    this.likeButton.classList.remove('loading');
+                }
+            }
+            
+            disableLikeButton() {
+                this.likeButton.classList.add('liked');
+                this.likeButton.innerHTML = '<i class="fas fa-heart"></i><span class="like-count">已点赞</span>';
+                this.likeIcon.classList.add('like-animation');
+                
+                setTimeout(() => {
+                    this.likeIcon.classList.remove('like-animation');
+                }, 500);
+            }
+            
+            showMessage(text, isError = false) {
+                const message = document.createElement('div');
+                message.className = 'vote-message';
+                message.textContent = text;
+                message.style.background = isError ? '#ff4757' : '#4CAF50';
+                
+                document.body.appendChild(message);
+                
+                setTimeout(() => {
+                    message.remove();
+                }, 3000);
+            }
+        }
+
+        // 初始化点赞系统
+        document.addEventListener('DOMContentLoaded', () => {
+            new SupabaseLikeSystem();
+        });
+    </script>
 </body>
 </html>
+
