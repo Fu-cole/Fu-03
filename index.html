@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>个人简介 - 黄跃</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 Supabase JS 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -365,14 +367,20 @@
             color: var(--primary);
         }
         
-        .like-btn:hover {
+        .like-btn:hover:not(.liked) {
             transform: translateY(-5px);
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
             background: var(--accent);
             color: white;
         }
         
-        .like-btn:active {
+        .like-btn.liked {
+            background: #ff4757;
+            color: white;
+            cursor: not-allowed;
+        }
+        
+        .like-btn:active:not(.liked) {
             transform: scale(0.95);
         }
         
@@ -382,7 +390,7 @@
             transition: all 0.3s ease;
         }
         
-        .like-btn:hover i {
+        .like-btn:hover:not(.liked) i {
             transform: scale(1.2);
         }
         
@@ -399,6 +407,29 @@
             0% { transform: scale(1); }
             50% { transform: scale(1.3); }
             100% { transform: scale(1); }
+        }
+        
+        .vote-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            z-index: 1001;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
         }
         
         @media (max-width: 768px) {
@@ -700,48 +731,10 @@
             this.reset();
         });
 
-        // 点赞功能
-        document.addEventListener('DOMContentLoaded', function() {
-            const likeButton = document.getElementById('likeButton');
-            const likeCount = document.getElementById('likeCount');
-            const likeIcon = likeButton.querySelector('i');
-            
-            // 从本地存储获取点赞数
-            let currentLikes = localStorage.getItem('pageLikes') || 0;
-            likeCount.textContent = currentLikes;
-            
-            // 点赞按钮点击事件
-            likeButton.addEventListener('click', function() {
-                // 增加点赞数
-                currentLikes++;
-                likeCount.textContent = currentLikes;
-                
-                // 保存到本地存储
-                localStorage.setItem('pageLikes', currentLikes);
-                
-                // 添加动画效果
-                likeIcon.classList.add('like-animation');
-                likeButton.style.background = '#ff7e5f';
-                likeButton.style.color = 'white';
-                
-                // 动画结束后移除类
-                setTimeout(() => {
-                    likeIcon.classList.remove('like-animation');
-                }, 500);
-                
-                // 显示感谢消息
-                if (currentLikes === 1) {
-                    alert('感谢你的第一个点赞！❤️');
-                } else if (currentLikes % 10 === 0) {
-                    alert(`哇！已经有 ${currentLikes} 个人点赞了！谢谢你！🎉`);
-                }
-            });
-        });
-    </script>
-        // Supabase 配置 - 替换为你的项目信息
+        // Supabase 配置
         const SUPABASE_CONFIG = {
-            url: 'https://hrrzmkebkouxmonpefyh.supabase.co',  // 替换为你的 Supabase URL
-            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhycnpta2Via291eG1vbnBlZnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4MjU2ODAsImV4cCI6MjA3NjQwMTY4MH0.qPsagPVEEeTe9ia39wcByn1ahXJx3Zb5vLGMQRmUS2o'  // 替换为你的 anon public 密钥
+            url: 'https://hrrzmkebkouxmonpefyh.supabase.co',
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhycnpta2Via291eG1vbnBlZnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4MjU2ODAsImV4cCI6MjA3NjQwMTY4MH0.qPsagPVEEeTe9ia39wcByn1ahXJx3Zb5vLGMQRmUS2o'
         };
 
         // 初始化 Supabase
@@ -851,4 +844,3 @@
     </script>
 </body>
 </html>
-
