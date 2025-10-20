@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>个人简介 - 黄跃</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- 引入 Supabase JS 库 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- 引入 Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -422,6 +423,10 @@
             animation: slideIn 0.5s ease;
         }
         
+        .vote-message.error {
+            background: #ff4757;
+        }
+        
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
@@ -731,117 +736,114 @@
             this.reset();
         });
 
-        // Supabase 配置
-        const SUPABASE_CONFIG = {
-            url: 'https://iclsbscdrjrhjhzrmijd.supabase.co',
-            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljbHNic2NkcmpyaGpoenJtaWpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5MTk1NzAsImV4cCI6MjA3NjQ5NTU3MH0.h2VDdw9fPXPAUlNcx2wA5H0jgP3ORrHU9kvfButPaFg'
+        // Firebase 配置 - 需要替换为你的配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyDcLyxeQ8j1E_BZeL2ZQSJmLswRVuYnSrs",
+            authDomain: "my-web4introduce.firebaseapp.com",
+            databaseURL: "https://my-web4introduce-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "my-web4introduce",
+            storageBucket: "my-web4introduce.firebasestorage.app",
+            messagingSenderId: "5897989453",
+            appId: "1:5897989453:web:ee09c7d9d494f40c255b04"
         };
 
-        // 初始化 Supabase
-        const supabase = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
+        // 初始化 Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
-        class SupabaseLikeSystem {
-            constructor() {
-                this.likeButton = document.getElementById('likeButton');
-                this.likeCount = document.getElementById('likeCount');
-                this.likeIcon = this.likeButton.querySelector('i');
-                this.isLoading = false;
+        // Firebase 点赞功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const likeButton = document.getElementById('likeButton');
+            const likeCount = document.getElementById('likeCount');
+            const likeIcon = likeButton.querySelector('i');
+            
+            // 从Firebase获取点赞数
+            const likesRef = database.ref('likes');
+            
+            // 监听点赞数变化
+            likesRef.on('value', (snapshot) => {
+                const data = snapshot.val() || { count: 0, voters: {} };
+                likeCount.textContent = data.count;
+            });
+            
+            // 检查用户是否已经点赞
+            function hasUserVoted() {
+                const voterId = localStorage.getItem('voterId');
+                if (!voterId) return false;
                 
-                this.init();
+                return new Promise((resolve) => {
+                    likesRef.child('voters').child(voterId).once('value', (snapshot) => {
+                        resolve(snapshot.exists());
+                    });
+                });
             }
             
-            async init() {
-                // 检查用户是否已经点赞
-                this.hasVoted = localStorage.getItem('hasVoted') === 'true';
-                
-                if (this.hasVoted) {
-                    this.disableLikeButton();
-                }
-                
-                // 获取当前点赞数
-                await this.updateLikeCount();
-                
-                // 绑定点击事件
-                this.likeButton.addEventListener('click', () => this.handleLike());
-            }
-            
-            async updateLikeCount() {
-                try {
-                    const { data, error } = await supabase
-                        .from('likes')
-                        .select('count')
-                        .eq('id', 1)
-                        .single();
-                    
-                    if (error) throw error;
-                    
-                    this.likeCount.textContent = data.count;
-                } catch (error) {
-                    console.error('获取点赞数失败:', error);
-                    this.likeCount.textContent = '?';
+            // 初始化检查
+            async function initLikeButton() {
+                const voted = await hasUserVoted();
+                if (voted) {
+                    likeButton.classList.add('liked');
+                    likeButton.innerHTML = '<i class="fas fa-heart"></i><span class="like-count">已点赞</span>';
                 }
             }
             
-            async handleLike() {
-                if (this.hasVoted || this.isLoading) return;
-                
-                this.isLoading = true;
-                this.likeButton.classList.add('loading');
-                
-                try {
-                    // 调用 Supabase 函数增加点赞数
-                    const { data, error } = await supabase
-                        .rpc('increment_likes');
-                    
-                    if (error) throw error;
-                    
-                    // 更新UI
-                    this.hasVoted = true;
-                    localStorage.setItem('hasVoted', 'true');
-                    this.disableLikeButton();
-                    this.showMessage('感谢你的点赞！❤️');
-                    
-                    // 更新计数
-                    await this.updateLikeCount();
-                    
-                } catch (error) {
-                    console.error('点赞失败:', error);
-                    this.showMessage('点赞失败，请重试', true);
-                } finally {
-                    this.isLoading = false;
-                    this.likeButton.classList.remove('loading');
-                }
-            }
+            initLikeButton();
             
-            disableLikeButton() {
-                this.likeButton.classList.add('liked');
-                this.likeButton.innerHTML = '<i class="fas fa-heart"></i><span class="like-count">已点赞</span>';
-                this.likeIcon.classList.add('like-animation');
+            // 点赞按钮点击事件
+            likeButton.addEventListener('click', async function() {
+                if (likeButton.classList.contains('liked')) {
+                    showMessage('你已经点过赞了！❤️');
+                    return;
+                }
                 
+                // 生成用户唯一标识
+                let voterId = localStorage.getItem('voterId');
+                if (!voterId) {
+                    voterId = 'voter_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('voterId', voterId);
+                }
+                
+                // 更新点赞数 - 使用事务确保数据一致性
+                likesRef.transaction((currentData) => {
+                    if (currentData) {
+                        if (!currentData.voters) currentData.voters = {};
+                        if (!currentData.voters[voterId]) {
+                            currentData.count = (currentData.count || 0) + 1;
+                            currentData.voters[voterId] = true;
+                        }
+                    } else {
+                        currentData = {
+                            count: 1,
+                            voters: { [voterId]: true }
+                        };
+                    }
+                    return currentData;
+                });
+                
+                // 更新UI
+                likeButton.classList.add('liked');
+                likeIcon.classList.add('like-animation');
+                
+                // 显示感谢消息
+                showMessage('感谢你的点赞！❤️');
+                
+                // 动画结束后移除类
                 setTimeout(() => {
-                    this.likeIcon.classList.remove('like-animation');
+                    likeIcon.classList.remove('like-animation');
                 }, 500);
-            }
+            });
             
-            showMessage(text, isError = false) {
+            function showMessage(text) {
                 const message = document.createElement('div');
                 message.className = 'vote-message';
                 message.textContent = text;
-                message.style.background = isError ? '#ff4757' : '#4CAF50';
-                
                 document.body.appendChild(message);
                 
                 setTimeout(() => {
                     message.remove();
                 }, 3000);
             }
-        }
-
-        // 初始化点赞系统
-        document.addEventListener('DOMContentLoaded', () => {
-            new SupabaseLikeSystem();
         });
     </script>
 </body>
 </html>
-
