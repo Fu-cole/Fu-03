@@ -892,6 +892,182 @@
                 }, 3000);
             }
         });
+        // 初始化评论引用
+    const commentsRef = database.ref('comments');
+    const commentForm = document.getElementById('commentForm');
+    const commentsList = document.getElementById('commentsList');
+    
+    // 加载评论函数
+    function loadComments() {
+        commentsRef.orderByChild('timestamp').once('value').then((snapshot) => {
+            const comments = snapshot.val();
+            commentsList.innerHTML = '';
+            
+            if (!comments || Object.keys(comments).length === 0) {
+                commentsList.innerHTML = '<div class="no-comments">暂无评论，快来发表第一条评论吧！</div>';
+                return;
+            }
+            
+            // 将评论按时间倒序排列
+            const sortedComments = Object.entries(comments)
+                .map(([id, comment]) => ({ id, ...comment }))
+                .sort((a, b) => b.timestamp - a.timestamp);
+            
+            sortedComments.forEach(comment => {
+                if (comment.approved !== false) { // 只显示已审核通过的评论
+                    const commentElement = createCommentElement(comment);
+                    commentsList.appendChild(commentElement);
+                }
+            });
+        }).catch((error) => {
+            console.error('加载评论失败:', error);
+            commentsList.innerHTML = '<div class="no-comments">评论加载失败，请刷新页面重试</div>';
+        });
+    }
+    
+    // 实时监听评论变化
+    commentsRef.orderByChild('timestamp').on('value', (snapshot) => {
+        const comments = snapshot.val();
+        commentsList.innerHTML = '';
+        
+        if (!comments || Object.keys(comments).length === 0) {
+            commentsList.innerHTML = '<div class="no-comments">暂无评论，快来发表第一条评论吧！</div>';
+            return;
+        }
+        
+        // 将评论按时间倒序排列
+        const sortedComments = Object.entries(comments)
+            .map(([id, comment]) => ({ id, ...comment }))
+            .sort((a, b) => b.timestamp - a.timestamp);
+        
+        sortedComments.forEach(comment => {
+            if (comment.approved !== false) { // 只显示已审核通过的评论
+                const commentElement = createCommentElement(comment);
+                commentsList.appendChild(commentElement);
+            }
+        });
+    });
+    
+    // 创建评论元素
+    function createCommentElement(comment) {
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment';
+        commentDiv.dataset.id = comment.id;
+        
+        const date = new Date(comment.timestamp);
+        const formattedDate = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        
+        commentDiv.innerHTML = `
+            <div class="comment-header">
+                <span class="comment-author">${escapeHtml(comment.name)}</span>
+                <span class="comment-date">${formattedDate}</span>
+            </div>
+            <div class="comment-content">${escapeHtml(comment.content)}</div>
+            <div class="comment-actions">
+                <button class="delete-btn" data-id="${comment.id}">
+                    <i class="fas fa-trash"></i> 删除
+                </button>
+            </div>
+        `;
+        
+        // 添加删除按钮事件
+        const deleteBtn = commentDiv.querySelector('.delete-btn');
+        deleteBtn.addEventListener('click', function() {
+            const commentId = this.dataset.id;
+            deleteComment(commentId);
+        });
+        
+        return commentDiv;
+    }
+    
+    // 删除评论
+    function deleteComment(commentId) {
+        if (confirm('确定要删除这条评论吗？')) {
+            commentsRef.child(commentId).remove()
+                .then(() => {
+                    showCommentMessage('评论删除成功');
+                })
+                .catch((error) => {
+                    console.error('删除评论失败:', error);
+                    showCommentMessage('删除评论失败，请重试', true);
+                });
+        }
+    }
+    
+    // 提交评论表单
+    commentForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('commentName').value.trim();
+        const content = document.getElementById('commentContent').value.trim();
+        
+        if (!name || !content) {
+            showCommentMessage('请填写完整的昵称和评论内容', true);
+            return;
+        }
+        
+        // 简单的垃圾评论检测
+        if (content.length < 5) {
+            showCommentMessage('评论内容太短，请至少输入5个字符', true);
+            return;
+        }
+        
+        if (content.length > 500) {
+            showCommentMessage('评论内容过长，请控制在500字符以内', true);
+            return;
+        }
+        
+        // 生成用户唯一标识
+        let userId = localStorage.getItem('commentUserId');
+        if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('commentUserId', userId);
+        }
+        
+        // 提交评论到Firebase
+        const newCommentRef = commentsRef.push();
+        newCommentRef.set({
+            name: name,
+            content: content,
+            timestamp: Date.now(),
+            userId: userId,
+            approved: true // 默认审核通过
+        })
+        .then(() => {
+            showCommentMessage('评论发表成功！');
+            commentForm.reset();
+        })
+        .catch((error) => {
+            console.error('发表评论失败:', error);
+            showCommentMessage('评论发表失败，请重试', true);
+        });
+    });
+    
+    // 显示评论相关消息
+    function showCommentMessage(text, isError = false) {
+        const message = document.createElement('div');
+        message.className = 'comment-message' + (isError ? ' error' : '');
+        message.textContent = text;
+        document.body.appendChild(message);
+        
+        setTimeout(() => {
+            if (message.parentNode) {
+                message.remove();
+            }
+        }, 3000);
+    }
+    
+    // HTML转义函数，防止XSS攻击
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // 初始加载评论
+    loadComments();
+});
     </script>
 </body>
 </html>
+
